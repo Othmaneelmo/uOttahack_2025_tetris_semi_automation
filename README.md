@@ -9,4 +9,5 @@ main repository for my team on the uOttahack Hackathon
 
 ## Ressources used
 
-> - Tetris Source code used was very inspired by [bharath-gowda-571](https://github.com/bharath-gowda-571/Tetris "Bharath Gowda")<br/>
+> - Tetris Source code used was very inspired by [bharath-gowda-571](https://github.com/bharath-gowda-571/Tetris "Bharath Gowda") , [danielchang2002](https://github.com/danielchang2002/tetris_ai "Daniel Chang"),  
+
