@@ -177,6 +177,16 @@ class Game:
         print("Rows cleared:", self.rows_cleared)
         return self.pieces_dropped, self.rows_cleared
 
+    def evaluate_board(self, board):
+        """
+        A simple heuristic to evaluate the board state:
+        - Penalize higher stack heights.
+        - Penalize gaps below the highest blocks.
+        """
+        total_height = sum(max((row_idx for row_idx, cell in enumerate(col) if cell), default=0) for col in zip(*board.board))
+        holes = sum(1 for col_idx, col in enumerate(zip(*board.board)) for row_idx, cell in enumerate(col) if not cell and any(col[:row_idx]))
+        return -total_height - 2 * holes
+
     def drop(self, y, x=None):
         if x is None:
             x = self.x
@@ -195,34 +205,9 @@ class Game:
                 user_input = input("Invalid input. Do you want to proceed? (y/n): ").strip().lower()
 
             if user_input == 'n':
-                print("Using AI to find an alternative move that avoids filling the main hole.")
-
-                # Identify the critical holes in the row(s) that would be completed
-                critical_holes = self.get_critical_holes(temp_board)
-
-                # Find an AI-guided move that avoids filling the critical hole
-                alternative_found = False
-                for col in range(self.board.width):
-                    for rotation in range(4):  # Try all rotations
-                        rotated_piece = self.curr_piece
-                        for _ in range(rotation):
-                            rotated_piece = rotated_piece.get_next_rotation()
-
-                        try:
-                            alt_y = self.board.drop_height(rotated_piece, col)
-                            temp_board = deepcopy(self.board)
-                            temp_board.place(col, alt_y, rotated_piece)
-
-                            # Check if this placement avoids clearing rows and avoids critical holes
-                            if temp_board.widths.count(temp_board.width) == 0 and self.fills_critical_holes(temp_board, rotated_piece, col, alt_y, critical_holes):
-                                x, y, self.curr_piece = col, alt_y, rotated_piece
-                                alternative_found = True
-                                break
-                    if alternative_found:
-                        break
-
-                if not alternative_found:
-                    print("No valid alternative moves found. Proceeding with the original move.")
+                print("Switching to manual control for this piece.")
+                self.manual_control()
+                return  # Exit drop to prevent further automatic placement
 
         # Place the current piece on the board
         self.board.place(x, y, self.curr_piece)
@@ -234,6 +219,104 @@ class Game:
         self.curr_piece = Piece()
         self.pieces_dropped += 1
 
+    def manual_control(self):
+        """
+        Allow the user to manually control the piece, holding it in suspension.
+        Controls:
+            - 'a': Move left
+            - 'd': Move right
+            - 'w': Rotate
+            - 's': Drop faster
+        """
+        print("Manual control activated. Use 'a' (left), 'd' (right), 'w' (rotate), 's' (faster drop).")
+    
+        # Reset the piece to the top
+        self.curr_piece = Piece(body=self.curr_piece.body, color=self.curr_piece.color)  # Recreate the same piece
+        self.x, self.y = 5, self.board.height - 1  # Reset to the top-middle of the board
+        clock = pygame.time.Clock()  # Create a clock to manage frame rate
+        drop_timer = 0  # Timer for automatic downward movement
+        drop_interval = 500  # Interval for automatic drop in milliseconds
+        running = True
+    
+        # Temporarily disable MOVEEVENT
+        pygame.time.set_timer(pygame.USEREVENT + 1, 0)
+    
+        while running:
+            dt = clock.tick(30)  # Limit to 30 frames per second and get delta time
+            drop_timer += dt  # Increment drop timer
+    
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+    
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_a:  # Move left
+                        if self.x > 0:
+                            occupied = any(
+                                self.board.board[self.y + b[1]][self.x + b[0] - 1]
+                                for b in self.curr_piece.body
+                                if self.y + b[1] < self.board.height
+                            )
+                            if not occupied:
+                                self.x -= 1
+                    elif event.key == pygame.K_d:  # Move right
+                        if self.x < self.board.width - len(self.curr_piece.skirt):
+                            occupied = any(
+                                self.board.board[self.y + b[1]][self.x + b[0] + 1]
+                                for b in self.curr_piece.body
+                                if self.y + b[1] < self.board.height
+                            )
+                            if not occupied:
+                                self.x += 1
+                    elif event.key == pygame.K_w:  # Rotate
+                        self.curr_piece = self.curr_piece.get_next_rotation()
+                    elif event.key == pygame.K_s:  # Faster drop
+                        drop_interval = 50  # Increase drop speed for faster movement
+    
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_s:  # Reset speed
+                        drop_interval = 500  # Reset to normal drop interval
+    
+            # Automatic downward movement
+            if drop_timer >= drop_interval:
+                self.y -= 1
+                drop_timer = 0  # Reset the drop timer
+    
+                # Check for collision or landing
+                if self.has_collision():
+                    self.y += 1  # Reset to last valid position
+                    self.board.place(self.x, self.y, self.curr_piece)
+                    print("Piece manually placed.")
+                    self.rows_cleared += self.board.clear_rows()
+                    self.curr_piece = Piece()  # Generate a new piece
+                    self.pieces_dropped += 1
+                    self.x, self.y = 5, self.board.height - 1
+                    running = False
+    
+            # Redraw the game state
+            self.screen.fill(BLACK)
+            self.draw()
+            pygame.display.flip()
+    
+        # Re-enable MOVEEVENT after manual control ends
+        pygame.time.set_timer(pygame.USEREVENT + 1, 100 if self.ai else 500)
+    
+
+
+
+
+
+    def has_collision(self):
+        """
+        Check if the current piece at (self.x, self.y) collides with the board or boundaries.
+        """
+        for block in self.curr_piece.body:
+            bx, by = self.x + block[0], self.y + block[1]
+            if bx < 0 or bx >= self.board.width or by < 0 or self.board.board[by][bx]:
+                return True
+        return False
+    
 
     def get_critical_holes(self, board):
         """
@@ -244,7 +327,7 @@ class Game:
             if width == board.width - 1:  # Row is one block short of completion
                 for col_idx, filled in enumerate(board.board[row_idx]):
                     if not filled:  # Add the hole position
-                        critical_holes.add((col_idx, row_idx))
+                        critical_holes.add((col_idx, self.board.height - row_idx - 1))
         return critical_holes
 
 
@@ -263,12 +346,11 @@ class Game:
         return holes_filled > 1
 
 
-
-
     def draw(self):
         self.draw_pieces()
         self.draw_hover()
         self.draw_grid()
+
 
     def draw_grid(self):
         for row in range(0, self.board.height):
@@ -288,6 +370,7 @@ class Game:
         pygame.draw.line(self.screen, WHITE, tr, br, width=2)
         pygame.draw.line(self.screen, WHITE, br, bl, width=2)
         pygame.draw.line(self.screen, WHITE, tl, bl, width=2)
+
 
     def draw_pieces(self):
         for row in range(self.board.height):
