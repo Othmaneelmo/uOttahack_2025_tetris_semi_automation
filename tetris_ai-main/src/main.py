@@ -6,7 +6,6 @@ import os
 def main():
 
     g = Game(sys.argv[1])
-
     g.run()
 
 

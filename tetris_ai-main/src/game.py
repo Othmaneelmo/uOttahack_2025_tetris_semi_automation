@@ -6,12 +6,11 @@ from genetic import Genetic_AI
 from mcts import MCTS_AI
 from piece import Piece
 import pygame
-import random
+
 
 BLACK = 0, 0, 0
 WHITE = 255, 255, 255
 GREEN = (0, 255, 0)
-
 
 class Game:
     def __init__(self, mode, agent=None):
@@ -82,8 +81,6 @@ class Game:
         print(self.pieces_dropped, self.rows_cleared)
         return self.pieces_dropped, self.rows_cleared
 
-
-
     def run(self):
         pygame.init()
         self.screenSize = self.screenWidth, self.screenHeight
@@ -131,13 +128,13 @@ class Game:
                             break
                     continue
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_s:
+                    if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                         y = self.board.drop_height(self.curr_piece, self.x)
                         self.drop(y)
                         if self.board.top_filled():
                             running = False
                             break
-                    if event.key == pygame.K_a:
+                    if event.key == pygame.K_a or event.key == pygame.K_LEFT:
                         if self.x - 1 >= 0:
                             occupied = False
                             for b in self.curr_piece.body:
@@ -148,7 +145,7 @@ class Game:
                                     break
                             if not occupied:
                                 self.x -= 1
-                    if event.key == pygame.K_d:
+                    if event.key == pygame.K_d or event.key == pygame.K_RIGHT:
                         if self.x + 1 <= self.board.width - len(self.curr_piece.skirt):
                             occupied = False
                             for b in self.curr_piece.body:
@@ -159,7 +156,7 @@ class Game:
                                     break
                             if not occupied:
                                 self.x += 1
-                    if event.key == pygame.K_w:
+                    if event.key == pygame.K_w or event.key == pygame.K_UP:
                         self.curr_piece = self.curr_piece.get_next_rotation()
                 if event.type == MOVEEVENT:
                     if self.board.drop_height(self.curr_piece, self.x) == self.y:
@@ -187,6 +184,7 @@ class Game:
         holes = sum(1 for col_idx, col in enumerate(zip(*board.board)) for row_idx, cell in enumerate(col) if not cell and any(col[:row_idx]))
         return -total_height - 2 * holes
 
+
     def drop(self, y, x=None):
         if x is None:
             x = self.x
@@ -197,14 +195,9 @@ class Game:
         rows_to_clear = temp_board.widths.count(temp_board.width)
 
         if rows_to_clear > 0:
-            print(f"A row is about to be cleared ({rows_to_clear} rows).")
-
-            # Pause and ask for user confirmation
-            user_input = input("Do you want to proceed? (y/n): ").strip().lower()
-            while user_input not in ['y', 'n']:
-                user_input = input("Invalid input. Do you want to proceed? (y/n): ").strip().lower()
-
-            if user_input == 'n':
+            self.display_row_completion_prompt(rows_to_clear)
+            user_decision = self.get_user_decision()
+            if user_decision == 'n':
                 print("Switching to manual control for this piece.")
                 self.manual_control()
                 return  # Exit drop to prevent further automatic placement
@@ -219,6 +212,38 @@ class Game:
         self.curr_piece = Piece()
         self.pieces_dropped += 1
 
+
+    def display_row_completion_prompt(self, rows_to_clear):
+        """Display a 'Yes/No' prompt with the number of rows to be completed."""
+        font = pygame.font.Font(None, 36)
+        prompt_text = f"Complete {rows_to_clear} row(s)? (Y/N)"
+        prompt = font.render(prompt_text, True, BLACK, WHITE)  # Black text with white background
+        rect = prompt.get_rect(center=(self.screenWidth // 2, self.screenHeight // 2))
+
+        # Draw the background rectangle
+        padding = 10
+        background_rect = pygame.Rect(
+            rect.left - padding, rect.top - padding,
+            rect.width + 2 * padding, rect.height + 2 * padding
+        )
+        pygame.draw.rect(self.screen, WHITE, background_rect)
+
+        # Draw the text on top of the rectangle
+        self.screen.blit(prompt, rect)
+        pygame.display.flip()
+
+    
+
+    def get_user_decision(self):
+        """Wait for the user to press 'y' or 'n'."""
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_y:
+                        return 'y'
+                    if event.key == pygame.K_n:
+                        return 'n'
+    
     def manual_control(self):
         """
         Allow the user to manually control the piece, holding it in suspension.
@@ -229,7 +254,7 @@ class Game:
             - 's': Drop faster
         """
         print("Manual control activated. Use 'a' (left), 'd' (right), 'w' (rotate), 's' (faster drop).")
-    
+
         # Reset the piece to the top
         self.curr_piece = Piece(body=self.curr_piece.body, color=self.curr_piece.color)  # Recreate the same piece
         self.x, self.y = 5, self.board.height - 1  # Reset to the top-middle of the board
@@ -237,21 +262,21 @@ class Game:
         drop_timer = 0  # Timer for automatic downward movement
         drop_interval = 500  # Interval for automatic drop in milliseconds
         running = True
-    
+
         # Temporarily disable MOVEEVENT
         pygame.time.set_timer(pygame.USEREVENT + 1, 0)
-    
+
         while running:
             dt = clock.tick(30)  # Limit to 30 frames per second and get delta time
             drop_timer += dt  # Increment drop timer
-    
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     exit()
-    
+
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_a:  # Move left
+                    if event.key == pygame.K_a or event.key == pygame.K_LEFT:  # Move left
                         if self.x > 0:
                             occupied = any(
                                 self.board.board[self.y + b[1]][self.x + b[0] - 1]
@@ -260,7 +285,7 @@ class Game:
                             )
                             if not occupied:
                                 self.x -= 1
-                    elif event.key == pygame.K_d:  # Move right
+                    elif event.key == pygame.K_d or event.key == pygame.K_RIGHT:  # Move right
                         if self.x < self.board.width - len(self.curr_piece.skirt):
                             occupied = any(
                                 self.board.board[self.y + b[1]][self.x + b[0] + 1]
@@ -269,20 +294,20 @@ class Game:
                             )
                             if not occupied:
                                 self.x += 1
-                    elif event.key == pygame.K_w:  # Rotate
+                    elif event.key == pygame.K_w or event.key == pygame.K_UP:  # Rotate
                         self.curr_piece = self.curr_piece.get_next_rotation()
-                    elif event.key == pygame.K_s:  # Faster drop
+                    elif event.key == pygame.K_s or event.key == pygame.K_DOWN:  # Faster drop
                         drop_interval = 50  # Increase drop speed for faster movement
-    
+
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_s:  # Reset speed
+                    if event.key == pygame.K_s or event.key == pygame.K_DOWN:  # Reset speed
                         drop_interval = 500  # Reset to normal drop interval
-    
+
             # Automatic downward movement
             if drop_timer >= drop_interval:
                 self.y -= 1
                 drop_timer = 0  # Reset the drop timer
-    
+
                 # Check for collision or landing
                 if self.has_collision():
                     self.y += 1  # Reset to last valid position
@@ -293,19 +318,15 @@ class Game:
                     self.pieces_dropped += 1
                     self.x, self.y = 5, self.board.height - 1
                     running = False
-    
+
             # Redraw the game state
             self.screen.fill(BLACK)
             self.draw()
             pygame.display.flip()
-    
+
         # Re-enable MOVEEVENT after manual control ends
         pygame.time.set_timer(pygame.USEREVENT + 1, 100 if self.ai else 500)
     
-
-
-
-
 
     def has_collision(self):
         """
