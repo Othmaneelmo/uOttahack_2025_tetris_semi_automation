@@ -23,6 +23,8 @@ class Game:
         self.top = 0
         self.pieces_dropped = 0
         self.rows_cleared = 0
+        self.score = 0  # Initialize score
+
         if mode == "greedy":
             self.ai = Greedy_AI()
         elif mode == "genetic":
@@ -34,6 +36,25 @@ class Game:
             self.ai = MCTS_AI()
         else:
             self.ai = None
+
+    def update_score(self, rows):
+        """
+        Update the score based on the number of rows cleared:
+        - 1 row = 50 points
+        - 2 rows = 100 * 1.5 = 150 points
+        - 3 rows = 150 * 2 = 300 points
+        - 4 rows = 200 * 3 = 600 points
+        """
+        if rows == 1:
+            self.score += 50
+        elif rows == 2:
+            self.score += 150
+        elif rows == 3:
+            self.score += 300
+        elif rows == 4:
+            self.score += 600
+        print(f"Score updated: {self.score}")
+    
     
     def pause_game(self):
         """Pause the game and wait for the user to resume or quit."""
@@ -240,9 +261,14 @@ class Game:
         self.y = 20
 
         # Clear rows if necessary
-        self.rows_cleared += self.board.clear_rows()
+        cleared_rows = self.board.clear_rows()
+        if cleared_rows > 0:
+            self.update_score(cleared_rows)  # Update the score dynamically
+            self.rows_cleared += cleared_rows
+
         self.curr_piece = Piece()
         self.pieces_dropped += 1
+
 
 
     def display_row_completion_prompt(self, rows_to_clear):
