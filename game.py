@@ -715,138 +715,246 @@ def move_left(y):
             map_pos()
 
 def move_down():
-    global lis,current_shape,current_pos,next_shape,allX,allY,game_over,shapes,speeds,keys,occupied,score,level,temp_level,game_saved
+    global lis, current_shape, current_pos, next_shape, allX, allY, game_over, shapes, speeds, keys, occupied, score, level, temp_level, game_saved
     if (not game_saved) and game_over:
         save_high_score()
-        game_saved=True
+        game_saved = True
+
     if not (game_over or paused):
-        if check_bottom(allX):
-            score+=20
-            temp_lis_completed_rows=[]
+        if check_bottom(allX):  # If the shape has reached the bottom
+            temp_lis_completed_rows = []  # To track rows that are cleared
+
+            # Loop through the grid to find completed rows
             for x in enumerate(lis):
-                if 0 not in x[1]:
-                    score+=50
-                    temp_lis_completed_rows.append(x[0])
-                    temp_occupied=[]
+                if 0 not in x[1]:  # If row is completely filled
+                    temp_lis_completed_rows.append(x[0])  # Add the row index to the list of completed rows
+
+                    # Remove the row from the occupied list
+                    temp_occupied = []
                     for y in occupied:
-                        if y[0]==x[0]:
+                        if y[0] == x[0]:
                             continue
                         temp_occupied.append(y)
-                    occupied=deepcopy(temp_occupied)
+                    occupied = deepcopy(temp_occupied)
+
+                    # Move the occupied blocks down
                     for y in range(len(occupied)):
-                        if occupied[y][0]<x[0]:
-                            occupied[y][0]+=1
+                        if occupied[y][0] < x[0]:
+                            occupied[y][0] += 1
+
+            # Calculate score multiplier based on the number of rows cleared
+            rows_cleared = len(temp_lis_completed_rows)  # Count how many rows were cleared at once
+            if rows_cleared > 0:
+                multiplier = rows_cleared  # Multiplier equals the number of rows cleared
+                score += rows_cleared * 50 * multiplier  # Add the points with the multiplier
+
+            # Clear the completed rows and add new empty rows at the top
             for z in temp_lis_completed_rows:
                 del lis[z]
-                lis=[[0,0,0,0,0,0,0,0,0,0,0,0,0,0]]+lis
+                lis = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] + lis
 
-             # switching shapes happens after this 
-            current_shape=next_shape
-            if len(shapes)==0:
-                shapes+=keys
-            next_shape=shapes.pop(random.randint(0,len(shapes)-1))
-            current_pos=start_pos(current_shape)
-            # map_pos()
+            # Switching shapes after the rows are cleared
+            current_shape = next_shape
+            if len(shapes) == 0:
+                shapes += keys
+            next_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+            current_pos = start_pos(current_shape)
             allX, allY = zip(*current_pos)
-            for i in current_pos:
-                if [i[0]+1,i[1]] in occupied:
-                    game_over=True
-                    break
-        level=math.ceil(score/2000)
 
-        if not (game_over or paused) :
+            # Check for game over condition when new shape overlaps
+            for i in current_pos:
+                if [i[0] + 1, i[1]] in occupied:
+                    game_over = True
+                    break
+
+        # Update level based on the score
+        level = math.ceil(score / 2000)
+
+        if not (game_over or paused):
+            # Move the current shape down one row
             for i in current_pos:
                 lis[i[0]][i[1]] = 0
-            current_pos[0][0]+=1
-            current_pos[1][0]+=1
-            current_pos[2][0]+=1
-            current_pos[3][0]+=1
+            current_pos[0][0] += 1
+            current_pos[1][0] += 1
+            current_pos[2][0] += 1
+            current_pos[3][0] += 1
             map_pos()
             allX, allY = zip(*current_pos)
 
-            if temp_level<level and level:
-                screen.blit(transparent,(10,10))
-                screen.blit(LevelUpText,(75,200))
+            # Check if level has increased and update the game
+            if temp_level < level and level:
+                screen.blit(transparent, (10, 10))
+                screen.blit(LevelUpText, (75, 200))
                 pygame.display.update()
                 time.sleep(2)
                 reset_board()
-                current_shape=shapes.pop(random.randint(0,len(shapes)-1))
-                next_shape=shapes.pop(random.randint(0,len(shapes)-1))
-                current_pos=start_pos(current_shape)
+                current_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+                next_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+                current_pos = start_pos(current_shape)
                 allX, allY = zip(*current_pos)
                 schedule.clear("move_down")
                 try:
                     schedule.every(speeds[level]).seconds.do(move_down).tag("move_down")
                 except KeyError:
                     schedule.every(speeds[9]).seconds.do(move_down).tag("move_down")
-                temp_level=level
+                temp_level = level
+
+        draw()
+
+def ai_move():
+    global current_shape, current_pos, allX, allY, game_over, occupied, lis
+
+    # Step 1: Simulate potential moves
+    best_move = None
+    best_score = -1
+
+    # Try rotating the shape (all 4 possible rotations for each shape)
+    if current_shape == "rect":
+        rotations = [rotate_rect]
+    elif current_shape == "S":
+        rotations = [rotate_S]
+    elif current_shape == "Z":
+        rotations = [rotate_Z]
+    elif current_shape == "J":
+        rotations = [rotate_J]
+    elif current_shape == "L":
+        rotations = [rotate_L]
+    elif current_shape == "T":
+        rotations = [rotate_T]
+    else:
+        rotations = []
+
+    # Evaluate each rotation and movement
+    for rotation in rotations:
+        for direction in ['left', 'right']:
+            for down_steps in range(14):
+                temp_pos = deepcopy(current_pos)  # Clone the position to simulate moves
+
+                # Rotate and move the piece
+                if direction == 'left':
+                    move_left(allY)
+                elif direction == 'right':
+                    move_right(allY)
+                current_pos = temp_pos
+                allX, allY = zip(*current_pos)
+
+                # Drop the piece down and simulate the new state
+                for _ in range(down_steps):
+                    move_down()
+
+                # Check if this move leads to row completion
+                score_from_move = 0
+                temp_lis_completed_rows = []
+                for x, row in enumerate(lis):
+                    if 0 not in row:
+                        score_from_move += 50
+                        temp_lis_completed_rows.append(x)
+
+                # If this move clears any rows, evaluate it
+                if score_from_move > best_score:
+                    best_score = score_from_move
+                    best_move = (rotation, direction, down_steps)
+
+    # Step 2: Execute the best move
+    if best_move:
+        rotation, direction, down_steps = best_move
+
+        # Apply the best rotation
+        rotation(allX, allY)
+
+        # Apply the best direction (left or right)
+        if direction == 'left':
+            move_left(allY)
+        elif direction == 'right':
+            move_right(allY)
+
+        # Move down for the best number of steps
+        for _ in range(down_steps):
+            move_down()
+
+        # Update the board
         draw()
 
 def main():
-    global next_shape,current_shape,current_pos,allX,allY,shapes,high_score,paused,game_over,keys,score,temp_level
+    global next_shape, current_shape, current_pos, allX, allY, shapes, high_score, paused, game_over, keys, score, temp_level, ai_mode
+
     # keys=['T', 'rect', 'square', 'Z', 'S', 'J', 'L']
     shapes=[]+keys
-    current_shape=shapes.pop(random.randint(0,len(shapes)-1))
-    next_shape=shapes.pop(random.randint(0,len(shapes)-1))
-    current_pos=start_pos(current_shape)
+    current_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+    next_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+    current_pos = start_pos(current_shape)
     map_pos()
     allX, allY = zip(*current_pos)
-    paused=False
-    high_score=0
-    game_saved=False
+    paused = False
+    high_score = 0
+    game_saved = False
+    ai_mode = False  # AI is initially off
+
     schedule.every(speeds[1]).seconds.do(move_down).tag("move_down")
     get_high_score()
-    running=True
+
+    running = True
     while running:
         schedule.run_pending()
-        # draw()
+
         for event in pygame.event.get():
-            if event.type==pygame.QUIT:
-                running=False
-            if event.type==pygame.KEYDOWN:
-                if event.key==pygame.K_RIGHT and not (game_over or paused):
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RIGHT and not (game_over or paused or ai_mode):
                     move_right(allY)
                     draw()
-                if event.key==pygame.K_LEFT and not (game_over or paused):
+                if event.key == pygame.K_LEFT and not (game_over or paused or ai_mode):
                     move_left(allY)
                     draw()
-                if event.key==pygame.K_UP and not (game_over or paused):
-                    if current_shape=="rect":
-                        rotate_rect(allX,allY)
-                    if current_shape=="S":
-                        rotate_S(allX,allY)
-                    if current_shape=="Z":
-                        rotate_Z(allX,allY)
-                    if current_shape=="J":
-                        rotate_J(allX,allY)
-                    if current_shape=="L":
-                        rotate_L(allX,allY)
-                    if current_shape=="T":
-                        rotate_T(allX,allY)
+                if event.key == pygame.K_UP and not (game_over or paused or ai_mode):
+                    if current_shape == "rect":
+                        rotate_rect(allX, allY)
+                    if current_shape == "S":
+                        rotate_S(allX, allY)
+                    if current_shape == "Z":
+                        rotate_Z(allX, allY)
+                    if current_shape == "J":
+                        rotate_J(allX, allY)
+                    if current_shape == "L":
+                        rotate_L(allX, allY)
+                    if current_shape == "T":
+                        rotate_T(allX, allY)
                     draw()
-                if event.key==pygame.K_DOWN and not (game_over or paused):
+                if event.key == pygame.K_DOWN and not (game_over or paused or ai_mode):
                     move_down()
                     # draw()
-                if event.key==pygame.K_SPACE:
+                if event.key == pygame.K_SPACE:
                     fall_down()
-                if event.key==pygame.K_ESCAPE:
-                    paused=not paused
+                if event.key == pygame.K_ESCAPE:
+                    paused = not paused
                     draw()
-                if event.key==pygame.K_r:
+                if event.key == pygame.K_r:
                     save_high_score()
                     reset_board()
-                    current_shape=shapes.pop(random.randint(0,len(shapes)-1))
-                    next_shape=shapes.pop(random.randint(0,len(shapes)-1))
-                    current_pos=start_pos(current_shape)
+                    current_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+                    next_shape = shapes.pop(random.randint(0, len(shapes) - 1))
+                    current_pos = start_pos(current_shape)
                     allX, allY = zip(*current_pos)
-                    game_over=False
-                    paused=False
-                    score=0
-                    temp_level=1
+                    game_over = False
+                    paused = False
+                    score = 0
+                    temp_level = 1
                     schedule.clear("move_down")
                     schedule.every(speeds[1]).seconds.do(move_down).tag("move_down")
                     get_high_score()
+
+                # Toggle AI mode with the 'A' key
+                if event.key == pygame.K_a:
+                    ai_mode = not ai_mode  # Toggle AI mode on/off
+                    
+
+        # If AI is enabled, run the AI
+        if ai_mode and not (game_over or paused):
+            ai_move()
+
     pygame.display.quit()
+
 
 if __name__ == "__main__":
     main()
