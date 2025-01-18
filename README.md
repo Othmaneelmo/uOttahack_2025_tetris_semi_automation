@@ -6,3 +6,7 @@ main repository for my team on the uOttahack Hackathon
 
 > -Othmane El Moutaouakkil<br/>
 > -Marven Monalliance<br/>
+
+##Ressources used
+
+> - Tetris Source code used was very inspired by [bharath-gowda-571](https://github.com/bharath-gowda-571/Tetris "Bharath Gowda")<br/>
