@@ -34,6 +34,36 @@ class Game:
             self.ai = MCTS_AI()
         else:
             self.ai = None
+    
+    def pause_game(self):
+        """Pause the game and wait for the user to resume or quit."""
+        font = pygame.font.Font(None, 48)
+        pause_text = ["Pause", "q: Quit", "Esc: Resume"]
+
+        # Clear the screen and display a background for the pause text
+        self.screen.fill(BLACK)
+        padding = 10
+
+        # Render each line of the message
+        for i, line in enumerate(pause_text):
+            pause_surface = font.render(line, True, WHITE)
+            rect = pause_surface.get_rect(center=(self.screenWidth // 2, self.screenHeight // 2 + i * (font.get_linesize() + padding)))
+            self.screen.blit(pause_surface, rect)
+
+        pygame.display.flip()
+
+        # Wait for the user to resume or quit
+        paused = True
+        while paused:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:  # Resume
+                        paused = False
+                    elif event.key == pygame.K_q:  # Quit
+                        pygame.quit()
+                        exit()
+
+
 
     def run_no_visual(self):
         if self.ai is None:
@@ -128,6 +158,8 @@ class Game:
                             break
                     continue
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:  # Pause the game
+                        self.pause_game()
                     if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                         y = self.board.drop_height(self.curr_piece, self.x)
                         self.drop(y)
@@ -243,17 +275,18 @@ class Game:
                         return 'y'
                     if event.key == pygame.K_n:
                         return 'n'
-    
+
     def manual_control(self):
         """
         Allow the user to manually control the piece, holding it in suspension.
         Controls:
-            - 'a': Move left
-            - 'd': Move right
-            - 'w': Rotate
-            - 's': Drop faster
+            - 'a' or LEFT: Move left
+            - 'd' or RIGHT: Move right
+            - 'w' or UP: Rotate
+            - 's' or DOWN: Drop faster
+            - SPACE: Drop instantly
         """
-        print("Manual control activated. Use 'a' (left), 'd' (right), 'w' (rotate), 's' (faster drop).")
+        print("Manual control activated. Use 'a' (left), 'd' (right), 'w' (rotate), 's' (faster drop), SPACE (instant drop).")
 
         # Reset the piece to the top
         self.curr_piece = Piece(body=self.curr_piece.body, color=self.curr_piece.color)  # Recreate the same piece
@@ -276,6 +309,8 @@ class Game:
                     exit()
 
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:  # Pause the game
+                        self.pause_game()
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT:  # Move left
                         if self.x > 0:
                             occupied = any(
@@ -298,6 +333,15 @@ class Game:
                         self.curr_piece = self.curr_piece.get_next_rotation()
                     elif event.key == pygame.K_s or event.key == pygame.K_DOWN:  # Faster drop
                         drop_interval = 50  # Increase drop speed for faster movement
+                    elif event.key == pygame.K_SPACE:  # Instant drop
+                        self.y = self.board.drop_height(self.curr_piece, self.x)  # Move directly to the bottom
+                        self.board.place(self.x, self.y, self.curr_piece)  # Place the piece
+                        print("Piece dropped instantly.")
+                        self.rows_cleared += self.board.clear_rows()
+                        self.curr_piece = Piece()  # Generate a new piece
+                        self.pieces_dropped += 1
+                        self.x, self.y = 5, self.board.height - 1
+                        running = False
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_s or event.key == pygame.K_DOWN:  # Reset speed
@@ -326,6 +370,7 @@ class Game:
 
         # Re-enable MOVEEVENT after manual control ends
         pygame.time.set_timer(pygame.USEREVENT + 1, 100 if self.ai else 500)
+
     
 
     def has_collision(self):
