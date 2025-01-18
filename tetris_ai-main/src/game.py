@@ -177,60 +177,93 @@ class Game:
         print("Rows cleared:", self.rows_cleared)
         return self.pieces_dropped, self.rows_cleared
 
-
-
     def drop(self, y, x=None):
         if x is None:
             x = self.x
-    
+
         # Simulate placing the piece to check for potential line clears
         temp_board = deepcopy(self.board)
         temp_board.place(x, y, self.curr_piece)
         rows_to_clear = temp_board.widths.count(temp_board.width)
-    
+
         if rows_to_clear > 0:
             print(f"A row is about to be cleared ({rows_to_clear} rows).")
-    
+
             # Pause and ask for user confirmation
             user_input = input("Do you want to proceed? (y/n): ").strip().lower()
             while user_input not in ['y', 'n']:
                 user_input = input("Invalid input. Do you want to proceed? (y/n): ").strip().lower()
-    
+
             if user_input == 'n':
-                print("AI will try a different move.")
-                # Find a random alternative move that does not complete a row
+                print("Using AI to find an alternative move that avoids filling the main hole.")
+
+                # Identify the critical holes in the row(s) that would be completed
+                critical_holes = self.get_critical_holes(temp_board)
+
+                # Find an AI-guided move that avoids filling the critical hole
                 alternative_found = False
-                for _ in range(100):  # Try a large number of random placements to find a valid one
-                    alt_x = random.randint(0, self.board.width - 1)
-                    alt_piece = deepcopy(self.curr_piece)
-                    for _ in range(random.randint(0, 3)):  # Randomize rotation
-                        alt_piece = alt_piece.get_next_rotation()
-                    temp_board = deepcopy(self.board)
-                    try:
-                        alt_y = temp_board.drop_height(alt_piece, alt_x)
-                        temp_board.place(alt_x, alt_y, alt_piece)
-                    except Exception:
-                        continue  # Skip invalid placements
-                    alt_rows_to_clear = temp_board.widths.count(temp_board.width)
-                    if alt_rows_to_clear == 0:  # Ensure no immediate line clear
-                        x, y, self.curr_piece = alt_x, alt_y, alt_piece
-                        alternative_found = True
+                for col in range(self.board.width):
+                    for rotation in range(4):  # Try all rotations
+                        rotated_piece = self.curr_piece
+                        for _ in range(rotation):
+                            rotated_piece = rotated_piece.get_next_rotation()
+
+                        try:
+                            alt_y = self.board.drop_height(rotated_piece, col)
+                            temp_board = deepcopy(self.board)
+                            temp_board.place(col, alt_y, rotated_piece)
+
+                            # Check if this placement avoids clearing rows and avoids critical holes
+                            if temp_board.widths.count(temp_board.width) == 0 and self.fills_critical_holes(temp_board, rotated_piece, col, alt_y, critical_holes):
+                                x, y, self.curr_piece = col, alt_y, rotated_piece
+                                alternative_found = True
+                                break
+                    if alternative_found:
                         break
-                    
+
                 if not alternative_found:
-                    print("No valid random moves found. Proceeding with current move.")
-    
+                    print("No valid alternative moves found. Proceeding with the original move.")
+
         # Place the current piece on the board
         self.board.place(x, y, self.curr_piece)
         self.x = 5
         self.y = 20
-    
+
         # Clear rows if necessary
         self.rows_cleared += self.board.clear_rows()
         self.curr_piece = Piece()
         self.pieces_dropped += 1
 
-        
+
+    def get_critical_holes(self, board):
+        """
+        Identify the critical holes in rows that would lead to a row being completed.
+        """
+        critical_holes = set()
+        for row_idx, width in enumerate(board.widths):
+            if width == board.width - 1:  # Row is one block short of completion
+                for col_idx, filled in enumerate(board.board[row_idx]):
+                    if not filled:  # Add the hole position
+                        critical_holes.add((col_idx, row_idx))
+        return critical_holes
+
+
+    def fills_critical_holes(self, board, piece, x, y, critical_holes):
+        """
+        Check if placing the piece at (x, y) fills more than one critical hole.
+        Allow one critical hole to remain.
+        """
+        holes_filled = 0
+        for block in piece.body:
+            bx, by = x + block[0], y + block[1]
+            if (bx, by) in critical_holes:
+                holes_filled += 1
+    
+        # Return True if more than one critical hole is filled
+        return holes_filled > 1
+
+
+
 
     def draw(self):
         self.draw_pieces()
