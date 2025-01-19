@@ -55,7 +55,35 @@ class Game:
             self.score += 600
         print(f"Score updated: {self.score}")
     
+    def show_pause_menu(self):
+        """Display the pause menu with the current score."""
+        font = pygame.font.Font(None, 48)
+        pause_text = ["Game Paused", f"Score: {self.score}", "Press P to Resume"]
     
+        # Fill the screen with a black background
+        self.screen.fill(BLACK)
+        padding = 20
+    
+        # Render and display each line of the pause menu
+        for i, line in enumerate(pause_text):
+            text_surface = font.render(line, True, WHITE)
+            rect = text_surface.get_rect(center=(self.screenWidth // 2, self.screenHeight // 2 + i * (font.get_linesize() + padding)))
+            self.screen.blit(text_surface, rect)
+    
+        pygame.display.flip()
+    
+        # Pause the game and wait for "P" to resume
+        paused = True
+        while paused:
+            for event in pygame.event.get():
+                print(f"Paused Event: {event}")  # Debug events during pause
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_p:  # Resume game on "P"
+                        print("P key detected, resuming game.")
+                        paused = False
+    
+
+
     def pause_game(self):
         """Pause the game and wait for the user to resume or quit."""
         font = pygame.font.Font(None, 48)
@@ -181,6 +209,8 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:  # Pause the game
                         self.pause_game()
+                    if event.key == pygame.K_p:  # Pause menu
+                        self.show_pause_menu()
                     if event.key == pygame.K_s or event.key == pygame.K_DOWN:
                         y = self.board.drop_height(self.curr_piece, self.x)
                         self.drop(y)
@@ -210,7 +240,12 @@ class Game:
                             if not occupied:
                                 self.x += 1
                     if event.key == pygame.K_w or event.key == pygame.K_UP:
-                        self.curr_piece = self.curr_piece.get_next_rotation()
+                        rotated_piece = self.curr_piece.get_next_rotation()  # Get the rotated piece
+                        if not self.has_collision(piece=rotated_piece, x=self.x, y=self.y):
+                            # Only apply rotation if it doesn't result in a collision
+                            self.curr_piece = rotated_piece
+                        else:
+                            print("Rotation blocked due to collision or boundary constraints.")
                 if event.type == MOVEEVENT:
                     if self.board.drop_height(self.curr_piece, self.x) == self.y:
                         self.drop(self.y)
@@ -337,6 +372,8 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:  # Pause the game
                         self.pause_game()
+                    if event.key == pygame.K_p:
+                        self.show_pause_menu()
                     if event.key == pygame.K_a or event.key == pygame.K_LEFT:  # Move left
                         if self.x > 0:
                             occupied = any(
@@ -356,7 +393,12 @@ class Game:
                             if not occupied:
                                 self.x += 1
                     elif event.key == pygame.K_w or event.key == pygame.K_UP:  # Rotate
-                        self.curr_piece = self.curr_piece.get_next_rotation()
+                        rotated_piece = self.curr_piece.get_next_rotation()  # Get the rotated piece
+                        if not self.has_collision(piece=rotated_piece, x=self.x, y=self.y):
+                            # Only apply rotation if it doesn't result in a collision
+                            self.curr_piece = rotated_piece
+                        else:
+                            print("Rotation blocked due to collision or boundary constraints.")
                     elif event.key == pygame.K_s or event.key == pygame.K_DOWN:  # Faster drop
                         drop_interval = 50  # Increase drop speed for faster movement
                     elif event.key == pygame.K_SPACE:  # Instant drop
@@ -396,19 +438,28 @@ class Game:
 
         # Re-enable MOVEEVENT after manual control ends
         pygame.time.set_timer(pygame.USEREVENT + 1, 100 if self.ai else 500)
-
     
+    def has_collision(self, piece=None, x=None, y=None):
+        """
+        Check if the given piece at position (x, y) collides with the board or boundaries.
+        Defaults to the current piece if no piece, x, or y is provided.
+        """
+        if piece is None:
+            piece = self.curr_piece
+        if x is None:
+            x = self.x
+        if y is None:
+            y = self.y
 
-    def has_collision(self):
-        """
-        Check if the current piece at (self.x, self.y) collides with the board or boundaries.
-        """
-        for block in self.curr_piece.body:
-            bx, by = self.x + block[0], self.y + block[1]
-            if bx < 0 or bx >= self.board.width or by < 0 or self.board.board[by][bx]:
+        for block in piece.body:
+            bx, by = x + block[0], y + block[1]
+            # Check boundaries
+            if bx < 0 or bx >= self.board.width or by < 0 or by >= self.board.height:
                 return True
-        return False
-    
+            # Check collision with other blocks
+            if self.board.board[by][bx]:
+                return True
+        return False    
 
     def get_critical_holes(self, board):
         """
