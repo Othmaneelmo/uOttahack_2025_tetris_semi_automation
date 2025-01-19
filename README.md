@@ -6,7 +6,7 @@ This projectwas done during the uOttaHack Hackathon of 2025
 > -Othmane El Moutaouakkil<br/>
 
 ## Run
- $ python3 src/main.py greedy
+ $ python3 src/main.py greedy<br/>
 inside the tetris_ai-main directory
 
 ## Ressources used
