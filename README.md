@@ -1,6 +1,5 @@
 # uOttahack_2025
-
-main repository for my team on the uOttahack Hackathon
+This projectwas done during the uOttaHack Hackathon of 2025
 
 ## Participants:
 
