@@ -239,13 +239,7 @@ class Game:
                                     break
                             if not occupied:
                                 self.x += 1
-                    if event.key == pygame.K_w or event.key == pygame.K_UP:
-                        rotated_piece = self.curr_piece.get_next_rotation()  # Get the rotated piece
-                        if not self.has_collision(piece=rotated_piece, x=self.x, y=self.y):
-                            # Only apply rotation if it doesn't result in a collision
-                            self.curr_piece = rotated_piece
-                        else:
-                            print("Rotation blocked due to collision or boundary constraints.")
+                        
                 if event.type == MOVEEVENT:
                     if self.board.drop_height(self.curr_piece, self.x) == self.y:
                         self.drop(self.y)
@@ -347,7 +341,7 @@ class Game:
             - 's' or DOWN: Drop faster
             - SPACE: Drop instantly
         """
-        print("Manual control activated. Use 'a' (left), 'd' (right), 'w' (rotate), 's' (faster drop), SPACE (instant drop).")
+        print("Manual control activated. Use 'a' (left), 'd' (right), 's' (faster drop), SPACE (instant drop).")
 
         # Reset the piece to the top
         self.curr_piece = Piece(body=self.curr_piece.body, color=self.curr_piece.color)  # Recreate the same piece
@@ -392,13 +386,8 @@ class Game:
                             )
                             if not occupied:
                                 self.x += 1
-                    elif event.key == pygame.K_w or event.key == pygame.K_UP:  # Rotate
-                        rotated_piece = self.curr_piece.get_next_rotation()  # Get the rotated piece
-                        if not self.has_collision(piece=rotated_piece, x=self.x, y=self.y):
-                            # Only apply rotation if it doesn't result in a collision
-                            self.curr_piece = rotated_piece
-                        else:
-                            print("Rotation blocked due to collision or boundary constraints.")
+
+
                     elif event.key == pygame.K_s or event.key == pygame.K_DOWN:  # Faster drop
                         drop_interval = 50  # Increase drop speed for faster movement
                     elif event.key == pygame.K_SPACE:  # Instant drop
@@ -439,27 +428,15 @@ class Game:
         # Re-enable MOVEEVENT after manual control ends
         pygame.time.set_timer(pygame.USEREVENT + 1, 100 if self.ai else 500)
     
-    def has_collision(self, piece=None, x=None, y=None):
+    def has_collision(self):
         """
-        Check if the given piece at position (x, y) collides with the board or boundaries.
-        Defaults to the current piece if no piece, x, or y is provided.
+        Check if the current piece at (self.x, self.y) collides with the board or boundaries.
         """
-        if piece is None:
-            piece = self.curr_piece
-        if x is None:
-            x = self.x
-        if y is None:
-            y = self.y
-
-        for block in piece.body:
-            bx, by = x + block[0], y + block[1]
-            # Check boundaries
-            if bx < 0 or bx >= self.board.width or by < 0 or by >= self.board.height:
+        for block in self.curr_piece.body:
+            bx, by = self.x + block[0], self.y + block[1]
+            if bx < 0 or bx >= self.board.width or by < 0 or self.board.board[by][bx]:
                 return True
-            # Check collision with other blocks
-            if self.board.board[by][bx]:
-                return True
-        return False    
+        return False
 
     def get_critical_holes(self, board):
         """
