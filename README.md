@@ -1,5 +1,5 @@
 # uOttahack_2025
-This projectwas done during the uOttaHack Hackathon of 2025
+This project was done during the uOttaHack Hackathon 7
 
 ## Participants:
 
